@@ -187,6 +187,7 @@ cat ~/.ssh/github_deploy.pub
 ```
 
 Add this public key to your GitHub repository:
+
 1. Go to Repository Settings → Deploy keys
 2. Add deploy key with the public key content
 3. Allow write access if needed

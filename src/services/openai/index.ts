@@ -31,23 +31,19 @@ class OpenAIClient {
 
   async createResponse(persona: Persona, prompt: string) {
     try {
-      const response = await this._openai.chat.completions.create({
+      const response = await this._openai.responses.create({
         model: this._model,
-        messages: [
+        tools: [
           {
-            role: 'system',
-            content: this.getInstructions(persona),
-          },
-          {
-            role: 'user',
-            content: prompt,
+            type: 'web_search_preview',
+            search_context_size: 'low',
           },
         ],
-        temperature: 0.9,
-        max_tokens: 1000,
+        instructions: this.getInstructions(persona),
+        input: prompt,
       });
 
-      return response.choices[0]?.message?.content || null;
+      return response.output_text;
     } catch (error) {
       console.error('Error with OpenAI:', error);
       if (error instanceof OpenAI.APIError) {
@@ -68,8 +64,7 @@ class OpenAIClient {
         model: this._imageModel,
         prompt: `${prompt} (in the style of a wise primate or ape-themed art)`,
         n: 1,
-        size: '1024x1024',
-        response_format: 'b64_json',
+        output_format: 'jpeg',
       });
 
       if (result.data && result.data[0]) {
