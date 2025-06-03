@@ -42,7 +42,10 @@ class PrimatePrime {
         prompt = prompt.replace(new RegExp(botMention, 'g'), '').trim();
       }
 
+      // Only use learn mode in the main server's learn channel
       const isLearnChannel =
+        process.env.DISCORD_GUILD_ID &&
+        message.guild?.id === process.env.DISCORD_GUILD_ID &&
         message.channel.id === process.env.DISCORD_LEARN_CHANNEL_ID;
 
       // Use DiscordService helper to build prompt from message chain if replying to bot
@@ -212,11 +215,8 @@ class PrimatePrime {
       await this._discord.registerSlashCommands();
 
       this._discord.on(DiscordEvents.MessageCreate, async (message) => {
-        // Ignore messages from other bots or from different guilds
-        if (
-          message.author.bot ||
-          message.guild?.id !== process.env.DISCORD_GUILD_ID
-        ) {
+        // Ignore messages from other bots
+        if (message.author.bot) {
           return;
         }
 
@@ -256,10 +256,8 @@ class PrimatePrime {
       });
 
       this._discord.on(DiscordEvents.MessageReactionAdd, async (reaction) => {
-        // Ignore reactions from:
-        // 1. Other bots
-        // 2. Messages not from the specified guild (server)
-        if (reaction.message.guild?.id !== process.env.DISCORD_GUILD_ID) {
+        // Ignore reactions from messages without a guild (DMs)
+        if (!reaction.message.guild) {
           return;
         }
 
@@ -292,6 +290,18 @@ class PrimatePrime {
         DiscordEvents.InteractionCreate,
         async (interaction: Interaction) => {
           if (!interaction.isChatInputCommand()) return;
+
+          // Only process slash commands in the main server
+          if (
+            process.env.DISCORD_GUILD_ID &&
+            interaction.guild?.id !== process.env.DISCORD_GUILD_ID
+          ) {
+            await interaction.reply({
+              content: `🍌 APE SLASH COMMANDS ONLY WORK IN MAIN JUNGLE! This is guest territory.`,
+              ephemeral: true,
+            });
+            return;
+          }
 
           switch (interaction.commandName) {
             case DISCORD_COMMANDS.LEARN:

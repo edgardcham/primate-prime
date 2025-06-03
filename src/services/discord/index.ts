@@ -240,14 +240,19 @@ export class DiscordService {
         })
         .filter(Boolean);
 
-      await rest.put(
-        Routes.applicationGuildCommands(
-          process.env.DISCORD_APP_ID!,
-          process.env.DISCORD_GUILD_ID!
-        ),
-        { body: commands }
-      );
-      console.log('Successfully registered slash commands.');
+      // Only register slash commands in the main server if GUILD_ID is provided
+      if (process.env.DISCORD_GUILD_ID) {
+        await rest.put(
+          Routes.applicationGuildCommands(
+            process.env.DISCORD_APP_ID!,
+            process.env.DISCORD_GUILD_ID
+          ),
+          { body: commands }
+        );
+        console.log('Successfully registered slash commands in main server.');
+      } else {
+        console.log('No DISCORD_GUILD_ID provided, skipping slash command registration.');
+      }
     } catch (error) {
       console.error('Error registering slash command:', error);
     }

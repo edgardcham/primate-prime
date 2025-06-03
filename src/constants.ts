@@ -48,7 +48,7 @@ export const DISCORD_COMMAND_DEFINITIONS: Record<
 export const REQUIRED_ENV = [
   'DISCORD_STARTUP_CHANNEL_ID',
   'DISCORD_LEARN_CHANNEL_ID',
-  'DISCORD_GUILD_ID',
+  'DISCORD_GUILD_ID', // Main server ID - slash commands and special features only work here
   'DISCORD_APP_ID',
   'DISCORD_TOKEN',
   'OPENAI_API_KEY',

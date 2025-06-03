@@ -58,7 +58,7 @@ Edit `.env` with your actual values:
 DISCORD_STARTUP_CHANNEL_ID=123456789012345678  # Channel for bot startup messages
 DISCORD_LEARN_CHANNEL_ID=123456789012345679    # Channel for learn mode (optional)
 DISCORD_TOKEN=your-bot-token-here               # From Discord Developer Portal
-DISCORD_GUILD_ID=123456789012345680            # Your server ID
+DISCORD_GUILD_ID=123456789012345680            # Your server ID (optional - see note below)
 DISCORD_APP_ID=123456789012345681              # Your application ID
 
 # OpenAI Configuration  
@@ -69,6 +69,12 @@ OPENAI_IMAGE_MODEL=dall-e-3                    # For image generation
 # Bot Configuration
 PRIMATE_PRIME_MOTD_CRON="0 8 * * *"           # Daily message at 8 AM
 ```
+
+**Multi-Server Architecture**: 
+- `DISCORD_GUILD_ID` defines your "main server" with full features
+- Main server features: Slash commands, learn channel, startup messages, daily MOTD
+- Other servers: Basic chat responses, web search, and image generation via mentions
+- The bot can be invited to unlimited servers while maintaining a "home base"
 
 ### 4. Getting Discord IDs
 
@@ -302,7 +308,7 @@ CMD ["yarn", "start"]
 |----------|-------------|---------|
 | `DISCORD_TOKEN` | Bot authentication token | `MTIzNDU2Nzg5MDEy...` |
 | `DISCORD_APP_ID` | Application ID | `1234567890123456` |
-| `DISCORD_GUILD_ID` | Server ID to register commands | `1234567890123456` |
+| `DISCORD_GUILD_ID` | Main server ID (required) - full features only here | `1234567890123456` |
 | `DISCORD_STARTUP_CHANNEL_ID` | Channel for startup messages | `1234567890123456` |
 | `DISCORD_LEARN_CHANNEL_ID` | Channel where learn mode is default | `1234567890123456` |
 | `OPENAI_API_KEY` | OpenAI API authentication | `sk-...` |
