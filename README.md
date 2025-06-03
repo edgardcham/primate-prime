@@ -15,6 +15,24 @@ Primate Prime is a Discord bot that channels the wisdom of an evolved ape throug
 - **Reaction Retry**: React with 🍌 emoji to regenerate responses
 - **Hot-Reloadable Configs**: Update personality without restarting
 - **Daily Message of the Day**: Scheduled banana wisdom
+- **Multi-Server Support**: Works in unlimited servers with tiered features
+
+### Multi-Server Architecture
+
+**Main Server** (defined by `DISCORD_GUILD_ID`):
+- ✅ Slash commands (`/learn`, `/image`)
+- ✅ Learn channel with Professor Primate mode
+- ✅ Startup greeting messages
+- ✅ Daily MOTD with weather reports
+- ✅ Full chat functionality when mentioned
+
+**Guest Servers** (any other server):
+- ✅ Chat responses when mentioned
+- ✅ Web search capabilities
+- ✅ Image generation (ask via mention)
+- ✅ Banana emoji (🍌) reactions
+- ❌ No slash commands
+- ❌ No scheduled messages
 
 ## Prerequisites
 
