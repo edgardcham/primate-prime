@@ -251,7 +251,9 @@ export class DiscordService {
         );
         console.log('Successfully registered slash commands in main server.');
       } else {
-        console.log('No DISCORD_GUILD_ID provided, skipping slash command registration.');
+        console.log(
+          'No DISCORD_GUILD_ID provided, skipping slash command registration.'
+        );
       }
     } catch (error) {
       console.error('Error registering slash command:', error);
