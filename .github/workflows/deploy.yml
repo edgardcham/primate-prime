@@ -1,0 +1,65 @@
+name: Deploy Primate Prime to Digital Ocean
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Copy .env.example to .env
+        run: cp .env.example .env
+
+      - name: Build
+        run: yarn build
+
+      - name: Check TypeScript
+        run: npx tsc --noEmit
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Build project
+        run: yarn build
+
+      - name: Deploy to Digital Ocean
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.DO_HOST }}
+          username: ${{ secrets.DO_USERNAME }}
+          key: ${{ secrets.DO_SSH_KEY }}
+          port: ${{ secrets.DO_PORT }}
+          script: |
+            cd ${{ secrets.DO_APP_PATH }}
+            git pull origin main
+            yarn install --frozen-lockfile
+            yarn build
+            pm2 restart primate-prime || pm2 start dist/index.js --name primate-prime --node-args="--loader ./dist/resolve-ts-paths-loader.mjs"
+            pm2 save

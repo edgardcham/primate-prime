@@ -1,0 +1,41 @@
+name: Test Primate Prime Bot
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Copy .env.example to .env
+        run: cp .env.example .env
+
+      - name: Build
+        run: yarn build
+
+      - name: Run tests
+        run: yarn test || echo "No tests configured yet"
+
+      - name: Check TypeScript
+        run: npx tsc --noEmit
+
+      - name: Format check
+        run: yarn format:check

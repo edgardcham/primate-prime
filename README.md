@@ -105,7 +105,14 @@ In the Discord Developer Portal:
    - Attach Files
    - Embed Links
    - Use Slash Commands
+   - Mention Everyone (for user mentions)
+   - Or use permissions integer: `274878072832`
 6. Copy the generated URL and open it to invite the bot to your server
+   
+   Example invite URL:
+   ```
+   https://discord.com/api/oauth2/authorize?client_id=YOUR_APP_ID&permissions=274878072832&scope=bot%20applications.commands
+   ```
 
 ### 6. Build and Start the Bot
 

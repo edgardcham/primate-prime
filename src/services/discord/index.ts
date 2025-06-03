@@ -270,8 +270,8 @@ export class DiscordService {
             content:
               index === messageChain.length - 1 &&
               entry.author === 'user' &&
-              this._mentionRegex
-                ? entry.content.replace(this._mentionRegex, '').trim()
+              this._discordClient.user?.id
+                ? entry.content.replace(new RegExp(`<@${this._discordClient.user.id}>`, 'g'), '').trim()
                 : entry.content,
           }));
 

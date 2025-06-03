@@ -34,9 +34,14 @@ class PrimatePrime {
 
   private async processMessage(message: DiscordMessage) {
     try {
-      let prompt = message.content
-        .replace(this._discord.mentionRegex!, '')
-        .trim();
+      // Only remove the bot's own mention, preserve other user mentions
+      let prompt = message.content;
+      if (this._discord.mentionRegex) {
+        // Replace only the bot's mention
+        const botMention = `<@${this._discord.client.user?.id}>`;
+        prompt = prompt.replace(new RegExp(botMention, 'g'), '').trim();
+      }
+      
       const isLearnChannel =
         message.channel.id === process.env.DISCORD_LEARN_CHANNEL_ID;
 
@@ -51,11 +56,17 @@ class PrimatePrime {
         (user) => user.id !== this._discord.client.user?.id
       );
 
+      // Debug logging
+      console.log('[Primate Prime] Processing message with prompt:', prompt);
+      console.log('[Primate Prime] Users to mention:', usersToMention.map(u => `${u.username} (${u.id})`));
+      
       // prompt openai with the enhanced content
       const response = await this._openaiClient.createResponse(
         isLearnChannel ? 'learn' : 'primate',
         prompt
       );
+      
+      console.log('[Primate Prime] AI Response:', response);
 
       if (response) {
         const reply = this._discord.buildMessageReply(
