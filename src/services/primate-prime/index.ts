@@ -41,7 +41,7 @@ class PrimatePrime {
         const botMention = `<@${this._discord.client.user?.id}>`;
         prompt = prompt.replace(new RegExp(botMention, 'g'), '').trim();
       }
-      
+
       const isLearnChannel =
         message.channel.id === process.env.DISCORD_LEARN_CHANNEL_ID;
 
@@ -58,14 +58,17 @@ class PrimatePrime {
 
       // Debug logging
       console.log('[Primate Prime] Processing message with prompt:', prompt);
-      console.log('[Primate Prime] Users to mention:', usersToMention.map(u => `${u.username} (${u.id})`));
-      
+      console.log(
+        '[Primate Prime] Users to mention:',
+        usersToMention.map((u) => `${u.username} (${u.id})`)
+      );
+
       // prompt openai with the enhanced content
       const response = await this._openaiClient.createResponse(
         isLearnChannel ? 'learn' : 'primate',
         prompt
       );
-      
+
       console.log('[Primate Prime] AI Response:', response);
 
       if (response) {
@@ -196,7 +199,9 @@ class PrimatePrime {
   public init(): Promise<void> {
     return new Promise(async (resolve) => {
       this._discord.once(DiscordEvents.ClientReady, async () => {
-        console.log(`🍌 APE ONLINE! Logged in as ${this._discord.client.user?.tag}`);
+        console.log(
+          `🍌 APE ONLINE! Logged in as ${this._discord.client.user?.tag}`
+        );
 
         this._discord.setupMentionRegex();
 

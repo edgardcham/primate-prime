@@ -153,8 +153,7 @@ export class DiscordService {
         let referencedMessage = await currentMessage.channel.messages.fetch(
           currentMessage.reference.messageId
         );
-        const tempChain: { author: 'user' | 'primate'; content: string }[] =
-          [];
+        const tempChain: { author: 'user' | 'primate'; content: string }[] = [];
         while (
           referencedMessage &&
           tempChain.length < DISCORD_MAX_MESSAGE_CHAIN_LENGTH
@@ -271,7 +270,12 @@ export class DiscordService {
               index === messageChain.length - 1 &&
               entry.author === 'user' &&
               this._discordClient.user?.id
-                ? entry.content.replace(new RegExp(`<@${this._discordClient.user.id}>`, 'g'), '').trim()
+                ? entry.content
+                    .replace(
+                      new RegExp(`<@${this._discordClient.user.id}>`, 'g'),
+                      ''
+                    )
+                    .trim()
                 : entry.content,
           }));
 
