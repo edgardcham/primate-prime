@@ -66,6 +66,29 @@ class PrimatePrime {
         usersToMention.map((u) => `${u.username} (${u.id})`)
       );
 
+      // Check if user is asking for an image in chat (for guest servers)
+      const imageKeywords = ['draw', 'create', 'generate', 'make', 'paint', 'sketch', 'picture', 'image', 'art'];
+      const isImageRequest = imageKeywords.some(keyword => 
+        prompt.toLowerCase().includes(keyword)
+      ) && (
+        prompt.toLowerCase().includes('image') || 
+        prompt.toLowerCase().includes('picture') ||
+        prompt.toLowerCase().includes('art')
+      );
+
+      if (isImageRequest && message.guild?.id !== process.env.DISCORD_GUILD_ID) {
+        // Guest server image generation via chat
+        const imagePrompt = prompt.replace(/^(draw|create|generate|make|paint|sketch)\s+(an?\s+)?(image|picture|art)\s+(of\s+)?/i, '').trim();
+        console.log('[Primate Prime] Image request detected in guest server:', imagePrompt);
+        
+        const base64Image = await this._openaiClient.createImage(imagePrompt);
+        if (base64Image) {
+          const imageReply = this._discord.buildImageReply(imagePrompt, base64Image);
+          await message.reply(imageReply);
+          return;
+        }
+      }
+
       // prompt openai with the enhanced content
       const response = await this._openaiClient.createResponse(
         isLearnChannel ? 'learn' : 'primate',
@@ -115,14 +138,22 @@ class PrimatePrime {
     }
 
     try {
-      // Generate response from OpenAI
-      const response = await this._openaiClient.createResponse(persona, prompt);
-
       // Send the response to the startup channel
       const channel = await this._discord.client.channels.fetch(
         this._discord.startupChannelId
       );
+      
+      // Only send messages if channel is in main server (when DISCORD_GUILD_ID is set)
+      if (process.env.DISCORD_GUILD_ID && channel && 'guild' in channel) {
+        if (channel.guild?.id !== process.env.DISCORD_GUILD_ID) {
+          console.log('Skipping message - startup channel not in main server');
+          return null;
+        }
+      }
+      
       if (channel && channel.isTextBased()) {
+        // Generate response from OpenAI
+        const response = await this._openaiClient.createResponse(persona, prompt);
         const messageOptions = this._discord.buildMessageReply(response || '');
         await (channel as any).send(messageOptions);
         return response;

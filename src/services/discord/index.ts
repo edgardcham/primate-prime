@@ -129,15 +129,15 @@ export class DiscordService {
     return {
       files: [
         new AttachmentBuilder(Buffer.from(base64Image, 'base64'), {
-          name: 'primate-art.png',
+          name: 'rooivalk.jpeg',
         }),
       ],
       embeds: [
         new EmbedBuilder({
-          title: 'APE CREATE ART 🎨🍌',
+          title: 'Image by @rooivalk',
           description: prompt,
           image: {
-            url: 'attachment://primate-art.png',
+            url: 'attachment://rooivalk.jpeg',
           },
         }),
       ],
