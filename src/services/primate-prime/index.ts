@@ -52,6 +52,11 @@ class PrimatePrime {
         message.guild?.id === process.env.DISCORD_GUILD_ID &&
         message.channel.id === process.env.DISCORD_LEARN_CHANNEL_ID;
 
+      // Check if we're in conversation mode
+      const isConversationChannel =
+        message.channel.id === process.env.DISCORD_CONVERSATION_CHANNEL_ID &&
+        this._conversationService?.isConversationActive();
+
       // Use DiscordService helper to build prompt from message chain if replying to bot
       const chainPrompt =
         await this._discord.buildPromptFromMessageChain(message);
@@ -119,7 +124,40 @@ class PrimatePrime {
         }
       }
 
-      // prompt openai with the enhanced content
+      // Handle conversation mode for Alpha bot
+      if (isConversationChannel && this._conversationService) {
+        // Add this message to conversation context
+        this._conversationService.addMessage(
+          message.author.id,
+          message.content
+        );
+
+        // Build context for Alpha bot
+        const context = this._conversationService.buildContextForBot(
+          this._discord.client.user?.id || ''
+        );
+        const fullPrompt = context + '\n\nRespond to: ' + prompt;
+
+        // Generate response using vanilla personality in conversation mode
+        const response = await this._openaiClient.createResponse(
+          'vanilla',
+          fullPrompt
+        );
+
+        if (response) {
+          const reply = this._discord.buildMessageReply(response);
+          await message.reply(reply);
+
+          // Add Alpha bot's response to conversation context
+          this._conversationService.addMessage(
+            this._discord.client.user?.id || '',
+            response
+          );
+        }
+        return;
+      }
+
+      // Normal mode - prompt openai with the enhanced content
       const response = await this._openaiClient.createResponse(
         isLearnChannel ? 'learn' : 'primate',
         prompt
@@ -138,14 +176,21 @@ class PrimatePrime {
       }
     } catch (error) {
       console.error('Error processing message:', error);
-      
+
       // Handle missing permissions gracefully
-      if (error instanceof Error && error.message.includes('Missing Permissions')) {
+      if (
+        error instanceof Error &&
+        error.message.includes('Missing Permissions')
+      ) {
         try {
-          await message.reply('🍌 APE NO HAVE PERMISSION! Ask admin to give ape "Attach Files" power!');
+          await message.reply(
+            '🍌 APE NO HAVE PERMISSION! Ask admin to give ape "Attach Files" power!'
+          );
         } catch {
           // Can't even send basic message - just log it
-          console.error('Cannot send any messages to this channel - missing basic permissions');
+          console.error(
+            'Cannot send any messages to this channel - missing basic permissions'
+          );
         }
         return;
       }
