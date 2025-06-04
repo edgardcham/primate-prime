@@ -62,7 +62,7 @@ class OpenAIClient {
     try {
       const result = await this._openai.images.generate({
         model: this._imageModel,
-        prompt: `${prompt} (in the style of a wise primate or ape-themed art)`,
+        prompt,
         n: 1,
         output_format: 'jpeg',
       });
