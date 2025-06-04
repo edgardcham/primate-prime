@@ -5,6 +5,7 @@ import { DISCORD_COMMANDS, DISCORD_EMOJI } from '@/constants';
 import OpenAIClient from '@/services/openai';
 import { DiscordService } from '@/services/discord';
 import type { DiscordMessage } from '@/services/discord';
+import type ConversationService from '@/services/conversation';
 
 import type { InMemoryConfig } from '@/types';
 
@@ -12,15 +13,18 @@ class PrimatePrime {
   protected _config: InMemoryConfig;
   protected _discord: DiscordService;
   protected _openaiClient: OpenAIClient;
+  protected _conversationService?: ConversationService;
 
   constructor(
     config: InMemoryConfig,
     discordService?: DiscordService,
-    openaiClient?: OpenAIClient
+    openaiClient?: OpenAIClient,
+    conversationService?: ConversationService
   ) {
     this._config = config;
     this._openaiClient = openaiClient ?? new OpenAIClient(this._config);
     this._discord = discordService ?? new DiscordService(this._config);
+    this._conversationService = conversationService;
   }
 
   /**
@@ -134,14 +138,33 @@ class PrimatePrime {
       }
     } catch (error) {
       console.error('Error processing message:', error);
-      const errorMessage = this._discord.getPrimateResponse('error');
+      
+      // Handle missing permissions gracefully
+      if (error instanceof Error && error.message.includes('Missing Permissions')) {
+        try {
+          await message.reply('🍌 APE NO HAVE PERMISSION! Ask admin to give ape "Attach Files" power!');
+        } catch {
+          // Can't even send basic message - just log it
+          console.error('Cannot send any messages to this channel - missing basic permissions');
+        }
+        return;
+      }
 
-      const reply =
-        error instanceof Error
-          ? `${errorMessage}\n\n\`\`\`${error.message}\`\`\``
-          : errorMessage;
-      await message.reply(reply);
-      return;
+      const errorMessage = this._discord.getPrimateResponse('error');
+      try {
+        const reply =
+          error instanceof Error
+            ? `${errorMessage}\n\n\`\`\`${error.message}\`\`\``
+            : errorMessage;
+        await message.reply(reply);
+      } catch {
+        // Fallback to simple message if detailed error fails
+        try {
+          await message.reply(errorMessage);
+        } catch {
+          console.error('Cannot send any messages to this channel');
+        }
+      }
     }
   }
 
@@ -261,6 +284,142 @@ class PrimatePrime {
     }
   }
 
+  private async handleStartCommand(
+    interaction: ChatInputCommandInteraction
+  ): Promise<void> {
+    await interaction.deferReply();
+
+    if (!this._conversationService) {
+      await interaction.editReply({
+        content: '🍌 APE CONFUSED! Conversation service not available.',
+      });
+      return;
+    }
+
+    const prompt = interaction.options.getString('prompt', true);
+    const alphaId = interaction.options.getString('alpha_id', true);
+    const betaId = interaction.options.getString('beta_id', true);
+    const turns = interaction.options.getString('turns') || '10';
+
+    try {
+      const maxTurns = parseInt(turns, 10) || 10;
+      const success = this._conversationService.startConversation(
+        interaction.channel?.id || '',
+        interaction.user.id,
+        alphaId,
+        betaId,
+        prompt,
+        maxTurns
+      );
+
+      if (success) {
+        await interaction.editReply({
+          content: `🗣️ **Conversation Started!**\n**Topic**: ${prompt}\n**Turns**: ${maxTurns}\n**Alpha**: <@${alphaId}>\n**Beta**: <@${betaId}>\n\nLet the discussion begin! 🍌`,
+        });
+
+        // Tag alpha bot to start the conversation
+        await interaction.followUp({
+          content: `<@${alphaId}> ${prompt}`,
+        });
+      } else {
+        await interaction.editReply({
+          content:
+            '🍌 APE SAYS NO! Conversation already active. Use `/stop` first.',
+        });
+      }
+    } catch (error) {
+      console.error('Error handling start command:', error);
+      await interaction.editReply({
+        content: '🍌 APE BRAIN MALFUNCTION! Failed to start conversation.',
+      });
+    }
+  }
+
+  private async handleContinueCommand(
+    interaction: ChatInputCommandInteraction
+  ): Promise<void> {
+    if (!this._conversationService) {
+      await interaction.reply({
+        content: '🍌 APE CONFUSED! Conversation service not available.',
+        ephemeral: true,
+      });
+      return;
+    }
+
+    const turns = interaction.options.getString('turns') || '5';
+    const additionalTurns = parseInt(turns, 10) || 5;
+
+    const success =
+      this._conversationService.continueConversation(additionalTurns);
+
+    if (success) {
+      const status = this._conversationService.getStatus();
+      await interaction.reply({
+        content: `🔄 **Conversation Continued!**\nAdded ${additionalTurns} more turns.\n**Total turns now**: ${status?.maxTurns || 0}`,
+        ephemeral: true,
+      });
+    } else {
+      await interaction.reply({
+        content: '🍌 APE CONFUSED! No active conversation to continue.',
+        ephemeral: true,
+      });
+    }
+  }
+
+  private async handleStopCommand(
+    interaction: ChatInputCommandInteraction
+  ): Promise<void> {
+    if (!this._conversationService) {
+      await interaction.reply({
+        content: '🍌 APE CONFUSED! Conversation service not available.',
+        ephemeral: true,
+      });
+      return;
+    }
+
+    const success = this._conversationService.stopConversation();
+
+    if (success) {
+      await interaction.reply({
+        content:
+          '⏹️ **Conversation Stopped!**\nThe bots have been silenced. 🍌',
+      });
+    } else {
+      await interaction.reply({
+        content: '🍌 APE SAYS: No conversation to stop!',
+        ephemeral: true,
+      });
+    }
+  }
+
+  private async handleStatusCommand(
+    interaction: ChatInputCommandInteraction
+  ): Promise<void> {
+    if (!this._conversationService) {
+      await interaction.reply({
+        content: '🍌 APE CONFUSED! Conversation service not available.',
+        ephemeral: true,
+      });
+      return;
+    }
+
+    const status = this._conversationService.getStatus();
+
+    if (!status || !status.isActive) {
+      await interaction.reply({
+        content:
+          '📊 **No Active Conversation**\nUse `/start` to begin a new conversation.',
+        ephemeral: true,
+      });
+      return;
+    }
+
+    await interaction.reply({
+      content: `📊 **Conversation Status**\n**Active**: ${status.isActive ? '✅' : '❌'}\n**Turn**: ${status.currentTurn}/${status.maxTurns}\n**Alpha**: <@${status.alphaId}>\n**Beta**: <@${status.betaId}>\n**Topic**: ${status.initialPrompt}`,
+      ephemeral: true,
+    });
+  }
+
   public init(): Promise<void> {
     return new Promise(async (resolve) => {
       this._discord.once(DiscordEvents.ClientReady, async () => {
@@ -371,6 +530,18 @@ class PrimatePrime {
               break;
             case DISCORD_COMMANDS.IMAGE:
               await this.handleImageCommand(interaction);
+              break;
+            case DISCORD_COMMANDS.START:
+              await this.handleStartCommand(interaction);
+              break;
+            case DISCORD_COMMANDS.CONTINUE:
+              await this.handleContinueCommand(interaction);
+              break;
+            case DISCORD_COMMANDS.STOP:
+              await this.handleStopCommand(interaction);
+              break;
+            case DISCORD_COMMANDS.STATUS:
+              await this.handleStatusCommand(interaction);
               break;
             default:
               console.error(

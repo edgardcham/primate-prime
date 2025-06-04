@@ -16,8 +16,9 @@ export type InMemoryConfig = {
   discordLimitMessages: string[];
   instructionsPrimate: string;
   instructionsLearn: string;
+  instructionsVanilla: string;
   motd: string;
 };
 
-export type Persona = 'primate' | 'learn';
+export type Persona = 'primate' | 'learn' | 'vanilla';
 export type ResponseType = 'error' | 'greeting' | 'discordLimit';

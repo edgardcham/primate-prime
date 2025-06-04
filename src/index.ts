@@ -4,7 +4,7 @@ import { REQUIRED_ENV } from '@/constants';
 import { watchConfigs } from '@/config/watcher';
 import { loadConfig } from '@/config/loader';
 import initCronTasks from '@/services/cron';
-import PrimatePrime from '@/services/primate-prime';
+import DualBotService from '@/services/dual-bot';
 
 async function main() {
   // Validate required environment variables at startup
@@ -17,22 +17,22 @@ async function main() {
   }
 
   const config = await loadConfig();
-  // Pass config to Primate Prime and other services as needed
-  const primatePrime = new PrimatePrime(config);
+  // Create dual bot service (Alpha + Beta bots)
+  const dualBotService = new DualBotService(config);
 
   // Watch for config changes and reload in-memory config
   watchConfigs(async (_) => {
     try {
       const newConfig = await loadConfig();
-      primatePrime.reloadConfig(newConfig);
+      dualBotService.reloadConfig(newConfig);
     } catch (error) {
       console.error('Failed to reload config:', error);
     }
   });
 
-  await primatePrime.init(); // Await the init method
+  await dualBotService.init(); // Initialize both bots
 
-  initCronTasks(primatePrime); // Call this after init completes
+  initCronTasks(dualBotService.primatePrime); // Cron tasks only for main bot
 }
 
 main().catch((error) => {

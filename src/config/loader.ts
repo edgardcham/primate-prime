@@ -8,6 +8,7 @@ import {
   CONFIG_FILE_DISCORD_LIMIT,
   CONFIG_FILE_INSTRUCTIONS_PRIMATE,
   CONFIG_FILE_INSTRUCTIONS_LEARN,
+  CONFIG_FILE_INSTRUCTIONS_VANILLA,
   CONFIG_FILE_MOTD,
 } from '@/constants';
 import type { InMemoryConfig } from '@/types';
@@ -69,6 +70,9 @@ export const loadConfig = async (): Promise<InMemoryConfig> => {
       CONFIG_FILE_INSTRUCTIONS_PRIMATE
     ),
     instructionsLearn: await loadInstructions(CONFIG_FILE_INSTRUCTIONS_LEARN),
+    instructionsVanilla: await loadInstructions(
+      CONFIG_FILE_INSTRUCTIONS_VANILLA
+    ),
     motd: await loadInstructions(CONFIG_FILE_MOTD),
   };
   return config;

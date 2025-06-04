@@ -24,6 +24,8 @@ class OpenAIClient {
         return this._config.instructionsPrimate;
       case 'learn':
         return this._config.instructionsLearn;
+      case 'vanilla':
+        return this._config.instructionsVanilla;
       default:
         return this._config.instructionsPrimate;
     }

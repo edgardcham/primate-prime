@@ -212,7 +212,7 @@ export class DiscordService {
 
   public async registerSlashCommands(): Promise<void> {
     const rest = new REST({ version: '10' }).setToken(
-      process.env.DISCORD_TOKEN!
+      process.env.DISCORD_ALPHA_TOKEN!
     );
 
     try {
@@ -244,8 +244,8 @@ export class DiscordService {
       if (process.env.DISCORD_GUILD_ID) {
         await rest.put(
           Routes.applicationGuildCommands(
-            process.env.DISCORD_APP_ID!,
-            process.env.DISCORD_GUILD_ID
+            process.env.DISCORD_ALPHA_APP_ID!,
+            process.env.DISCORD_GUILD_ID!
           ),
           { body: commands }
         );
@@ -322,6 +322,6 @@ export class DiscordService {
   }
 
   public async login(): Promise<void> {
-    await this._discordClient.login(process.env.DISCORD_TOKEN);
+    await this._discordClient.login(process.env.DISCORD_ALPHA_TOKEN!);
   }
 }
