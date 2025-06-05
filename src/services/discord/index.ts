@@ -103,6 +103,14 @@ export class DiscordService {
   }
 
   public buildMessageReply(content: string, allowedMentions: string[] = []) {
+    // Remove any self-mentions to prevent bot from tagging itself
+    if (this._discordClient.user?.id) {
+      const selfMention = `<@${this._discordClient.user.id}>`;
+      const selfMentionNick = `<@!${this._discordClient.user.id}>`;
+      content = content.replace(new RegExp(selfMention, 'g'), '');
+      content = content.replace(new RegExp(selfMentionNick, 'g'), '');
+    }
+
     if (content.length > DISCORD_MESSAGE_LIMIT) {
       const attachment = new AttachmentBuilder(Buffer.from(content, 'utf-8'), {
         name: 'primate-wisdom.md',

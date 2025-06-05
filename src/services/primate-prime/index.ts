@@ -14,6 +14,7 @@ class PrimatePrime {
   protected _discord: DiscordService;
   protected _openaiClient: OpenAIClient;
   protected _conversationService?: ConversationService;
+  protected _betaBotId?: string;
 
   constructor(
     config: InMemoryConfig,
@@ -25,6 +26,10 @@ class PrimatePrime {
     this._openaiClient = openaiClient ?? new OpenAIClient(this._config);
     this._discord = discordService ?? new DiscordService(this._config);
     this._conversationService = conversationService;
+  }
+
+  public setBetaBotId(betaBotId: string): void {
+    this._betaBotId = betaBotId;
   }
 
   /**
@@ -127,7 +132,7 @@ class PrimatePrime {
       // Handle conversation mode for Alpha bot
       if (isConversationChannel && this._conversationService) {
         // Add this message to conversation context
-        this._conversationService.addMessage(
+        await this._conversationService.addMessage(
           message.author.id,
           message.content
         );
@@ -149,7 +154,7 @@ class PrimatePrime {
           await message.reply(reply);
 
           // Add Alpha bot's response to conversation context
-          this._conversationService.addMessage(
+          await this._conversationService.addMessage(
             this._discord.client.user?.id || '',
             response
           );
@@ -342,9 +347,22 @@ class PrimatePrime {
     }
 
     const prompt = interaction.options.getString('prompt', true);
-    const alphaId = interaction.options.getString('alpha_id', true);
-    const betaId = interaction.options.getString('beta_id', true);
     const turns = interaction.options.getString('turns') || '10';
+
+    // Get actual bot IDs
+    const alphaId = this._discord.client.user?.id || '';
+    const betaId = this._betaBotId || '';
+
+    console.log('[START COMMAND] Alpha ID:', alphaId);
+    console.log('[START COMMAND] Beta ID:', betaId);
+    console.log('[START COMMAND] Alpha user tag:', this._discord.client.user?.tag);
+
+    if (!betaId) {
+      await interaction.editReply({
+        content: '🍌 APE CONFUSED! Beta bot not configured for conversations.',
+      });
+      return;
+    }
 
     try {
       const maxTurns = parseInt(turns, 10) || 10;
@@ -359,13 +377,41 @@ class PrimatePrime {
 
       if (success) {
         await interaction.editReply({
-          content: `🗣️ **Conversation Started!**\n**Topic**: ${prompt}\n**Turns**: ${maxTurns}\n**Alpha**: <@${alphaId}>\n**Beta**: <@${betaId}>\n\nLet the discussion begin! 🍌`,
+          content: `🗣️ **Conversation Started!**\n**Topic**: ${prompt}\n**Turns**: ${maxTurns}\n**Alpha**: <@${alphaId}>\n**Beta**: <@${betaId}>\n\nStarting conversation now...`,
         });
 
-        // Tag alpha bot to start the conversation
-        await interaction.followUp({
-          content: `<@${alphaId}> ${prompt}`,
-        });
+        // Automatically start the conversation by generating Alpha's first message
+        setTimeout(async () => {
+          try {
+            if (!this._conversationService) {
+              console.error('Conversation service not available for auto-start');
+              return;
+            }
+
+            // Build context for Alpha bot
+            const context = this._conversationService.buildContextForBot(alphaId);
+            const fullPrompt = context + '\n\nStart the conversation about: ' + prompt;
+
+            // Generate Alpha's response using vanilla personality
+            const response = await this._openaiClient.createResponse(
+              'vanilla',
+              fullPrompt
+            );
+
+            if (response) {
+              const channel = interaction.channel;
+              if (channel && channel.isTextBased()) {
+                const reply = this._discord.buildMessageReply(response);
+                await (channel as any).send(reply);
+
+                // Add Alpha bot's message to conversation context
+                await this._conversationService.addMessage(alphaId, response);
+              }
+            }
+          } catch (error) {
+            console.error('Error auto-starting conversation:', error);
+          }
+        }, 1000); // Small delay to let the reply finish
       } else {
         await interaction.editReply({
           content:
@@ -400,9 +446,44 @@ class PrimatePrime {
     if (success) {
       const status = this._conversationService.getStatus();
       await interaction.reply({
-        content: `🔄 **Conversation Continued!**\nAdded ${additionalTurns} more turns.\n**Total turns now**: ${status?.maxTurns || 0}`,
+        content: `🔄 **Conversation Continued!**\nAdded ${additionalTurns} more turns.\n**Total turns now**: ${status?.maxTurns || 0}\n\nRestarting conversation flow...`,
         ephemeral: true,
       });
+
+      // Trigger next speaker to continue the conversation
+      setTimeout(async () => {
+        try {
+          if (!this._conversationService) {
+            console.error('Conversation service not available for continue');
+            return;
+          }
+
+          const nextSpeakerId = this._conversationService.getNextSpeakerId();
+          if (nextSpeakerId) {
+            const isAlpha = nextSpeakerId === this._discord.client.user?.id;
+            
+            if (isAlpha) {
+              // Alpha bot should respond
+              const context = this._conversationService.buildContextForBot(nextSpeakerId);
+              const fullPrompt = context + '\n\nContinue the conversation:';
+              
+              const response = await this._openaiClient.createResponse('vanilla', fullPrompt);
+              
+              if (response) {
+                const channel = interaction.channel;
+                if (channel && channel.isTextBased()) {
+                  const reply = this._discord.buildMessageReply(response);
+                  await (channel as any).send(reply);
+                  await this._conversationService.addMessage(nextSpeakerId, response);
+                }
+              }
+            }
+            // Note: Beta bot will respond automatically when Alpha mentions it
+          }
+        } catch (error) {
+          console.error('Error continuing conversation:', error);
+        }
+      }, 1000);
     } else {
       await interaction.reply({
         content: '🍌 APE CONFUSED! No active conversation to continue.',
@@ -481,9 +562,15 @@ class PrimatePrime {
       await this._discord.registerSlashCommands();
 
       this._discord.on(DiscordEvents.MessageCreate, async (message) => {
-        // Ignore messages from other bots
+        // During conversations, allow messages from Beta bot, otherwise ignore bot messages
         if (message.author.bot) {
-          return;
+          // Only allow Beta bot messages during active conversations
+          if (
+            !this._conversationService?.isConversationActive() ||
+            message.author.id !== this._betaBotId
+          ) {
+            return;
+          }
         }
 
         // Check if the message is a reply to the bot

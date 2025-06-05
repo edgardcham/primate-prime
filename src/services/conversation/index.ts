@@ -24,6 +24,11 @@ export interface ConversationState {
   adminId: string;
 }
 
+// Constants for rolling window
+const WINDOW = 6;          // verbatim turns kept
+const CHUNK = 6;           // size of each compaction batch
+const MAX_SUMMARIES = 10;  // ring buffer for summaries
+
 class ConversationService {
   private _config: InMemoryConfig;
   private _openaiClient: OpenAIClient;
@@ -109,6 +114,22 @@ class ConversationService {
     return true;
   }
 
+  public getNextSpeakerId(): string | null {
+    if (!this._state?.isActive) {
+      return null;
+    }
+
+    // If no one has spoken yet, alpha starts
+    if (this._state.lastSpeaker === null) {
+      return this._state.alphaId;
+    }
+
+    // Alternate speakers
+    return this._state.lastSpeaker === 'alpha'
+      ? this._state.betaId
+      : this._state.alphaId;
+  }
+
   public stopConversation(): boolean {
     if (!this._state?.isActive) {
       return false;
@@ -152,7 +173,7 @@ class ConversationService {
       : this._state.alphaId;
   }
 
-  public addMessage(userId: string, content: string): void {
+  public async addMessage(userId: string, content: string): Promise<void> {
     if (!this._state?.isActive) {
       return;
     }
@@ -164,9 +185,22 @@ class ConversationService {
           ? 'beta'
           : 'admin';
 
+    // Clean content by removing Discord mentions to avoid confusion
+    const cleanContent = content
+      .replace(/<@!?\d+>/g, '')
+      .trim();
+
+    // Duplicate guard: prevent bot->bot double posts
+    const last = this._state.context.at(-1);
+    if (last && last.speaker === speaker && 
+        this.calculateOverlap(last.content, cleanContent) > 0.9) {
+      console.log('[Conversation] Duplicate message detected, ignoring');
+      return;
+    }
+
     const message: ConversationMessage = {
       speaker,
-      content,
+      content: cleanContent,
       timestamp: new Date(),
       userId,
     };
@@ -178,78 +212,103 @@ class ConversationService {
       this._state.currentTurn++;
     }
 
-    // Check if we need to compact memory
-    if (this._state.context.length > 10) {
-      this.compactMemory();
-    }
+    // Use new compaction strategy
+    await this.maybeCompact();
 
     this.saveState();
   }
 
-  private async compactMemory(): Promise<void> {
-    if (!this._state || this._state.context.length <= 10) {
-      return;
-    }
+  private async maybeCompact(): Promise<void> {
+    if (!this._state) return;
+
+    // How many full turns (non-admin) do we have?
+    const nonAdmin = this._state.context.filter(m => m.speaker !== 'admin');
+    if (nonAdmin.length <= WINDOW + CHUNK) return; // nothing to compact yet
+
+    // Carve out the *oldest* CHUNK that sits before the last WINDOW
+    const cutIndex = nonAdmin.length - WINDOW - CHUNK;
+    const slice = nonAdmin.slice(cutIndex, cutIndex + CHUNK);
+
+    // Build raw text for summary
+    const convo = slice.map(m => `${m.speaker}: ${m.content}`).join('\n');
+
+    const prompt = `summarize the following 6-turn chat in ≤25 words.
+• start with a 3-word tag in brackets.
+• give 1–2 short bullet lines.
+
+${convo}`.trim();
 
     try {
-      // Take the oldest 5 messages to compact
-      const messagesToCompact = this._state.context.splice(0, 5);
-      const conversationText = messagesToCompact
-        .map((msg) => `${msg.speaker}: ${msg.content}`)
-        .join('\n');
+      const summary = await this._openaiClient.createResponse('learn', prompt);
+      if (!summary) return;
 
-      const compactionPrompt = `Summarize this conversation into 1-2 sentences, preserving key points and context:\n\n${conversationText}`;
+      // Ring-buffer the summaries
+      const mem = this._state.compactedMemory;
+      if (mem.length >= MAX_SUMMARIES) mem.shift();
+      mem.push(summary.trim());
 
-      const summary = await this._openaiClient.createResponse(
-        'learn',
-        compactionPrompt
-      );
+      // Actually remove those CHUNK messages from context
+      this._state.context = this._state.context.filter(m => !slice.includes(m));
 
-      if (summary) {
-        this._state.compactedMemory.push(summary);
-        console.log('[Conversation] Compacted memory:', summary);
-      }
+      this.saveState();
+      console.log('[Conversation] Compacted:', summary);
     } catch (error) {
       console.error('Error compacting memory:', error);
     }
   }
 
   public buildContextForBot(botId: string): string {
-    if (!this._state?.isActive) {
-      return '';
+    if (!this._state?.isActive) return '';
+
+    const otherId = (botId === this._state.alphaId) 
+      ? this._state.betaId 
+      : this._state.alphaId;
+
+    let out = '';
+
+    // 1) Long-term memory (oldest → newest)
+    if (this._state.compactedMemory.length) {
+      out += 'conversation memory (oldest → newest):\n';
+      out += this._state.compactedMemory.join('\n') + '\n\n';
     }
 
-    let context = '';
-
-    // Add compacted memory
-    if (this._state.compactedMemory.length > 0) {
-      context += 'Previous conversation summary:\n';
-      context += this._state.compactedMemory.join('\n') + '\n\n';
+    // 2) Last WINDOW verbatim
+    const recent = this._state.context.slice(-WINDOW);
+    if (recent.length > 0) {
+      out += 'recent turns:\n';
+      out += recent.map(m => `${m.speaker}: ${m.content}`).join('\n') + '\n\n';
     }
 
-    // Add recent context
-    if (this._state.context.length > 0) {
-      context += 'Recent conversation:\n';
-      context +=
-        this._state.context
-          .map((msg) => `${msg.speaker}: ${msg.content}`)
-          .join('\n') + '\n\n';
+    // 3) Check for overlap warning  
+    if (recent.length >= 2) {
+      const last = recent.at(-1);
+      const prev = recent.at(-2);
+      if (last && prev && last.speaker !== prev.speaker) {
+        const overlap = this.calculateOverlap(last.content, prev.content);
+        if (overlap > 0.8) {
+          out += 'reminder: avoid repeating partner; offer fresh wording.\n\n';
+        }
+      }
     }
 
-    // Add initial prompt if this is the first message
+    // 4) Add initial prompt if first message
     if (this._state.currentTurn === 0) {
-      context += `Initial topic: ${this._state.initialPrompt}\n\n`;
+      out += `initial topic: ${this._state.initialPrompt}\n\n`;
     }
 
-    // Determine who to tag
-    const otherBotId =
-      botId === this._state.alphaId ? this._state.betaId : this._state.alphaId;
+    // 5) Style + tag instruction
+    out += `IMPORTANT: begin with <@${otherId}> and follow the STYLE rules in the system prompt.\n`;
+    out += `NEVER tag yourself (<@${botId}>), ONLY tag your conversation partner.`;
 
-    context += `You are having a conversation. Tag the other participant: <@${otherBotId}>\n`;
-    context +=
-      'Respond naturally and conversationally. Keep responses concise but engaging.';
+    return out;
+  }
 
-    return context;
+  private calculateOverlap(text1: string, text2: string): number {
+    const words1 = new Set(text1.toLowerCase().split(/\s+/));
+    const words2 = new Set(text2.toLowerCase().split(/\s+/));
+    const intersection = new Set([...words1].filter(x => words2.has(x)));
+    const union = new Set([...words1, ...words2]);
+    return union.size > 0 ? intersection.size / union.size : 0;
   }
 
   public shouldContinueConversation(): boolean {

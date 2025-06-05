@@ -57,16 +57,6 @@ export const DISCORD_COMMAND_DEFINITIONS: Record<
         required: true,
       },
       {
-        name: 'alpha_id',
-        description: 'Alpha bot user ID',
-        required: true,
-      },
-      {
-        name: 'beta_id',
-        description: 'Beta bot user ID',
-        required: true,
-      },
-      {
         name: 'turns',
         description: 'Number of conversation turns',
         required: false,

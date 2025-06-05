@@ -70,29 +70,31 @@ class DualBotService {
   private async processBetaBotMessage(message: DiscordMessage): Promise<void> {
     // Beta bot ONLY responds in conversation channel in main server
     if (message.channel.id !== process.env.DISCORD_CONVERSATION_CHANNEL_ID) {
+      console.log('[Beta Bot] Ignoring - not conversation channel');
       return;
     }
 
     // Beta bot ONLY works in main server
     if (message.guild?.id !== process.env.DISCORD_GUILD_ID) {
+      console.log('[Beta Bot] Ignoring - not main server');
       return;
     }
 
     // Check if beta bot is mentioned
     const betaBotMention = `<@${this._betaBotClient.user?.id}>`;
+    console.log('[Beta Bot] Checking for mention:', betaBotMention, 'in message:', message.content);
     if (!message.content.includes(betaBotMention)) {
+      console.log('[Beta Bot] Not mentioned - ignoring');
       return;
     }
 
-    // Check if this is part of an active conversation
-    if (
-      !this._conversationService.shouldRespondInChannel(
-        message.channel.id,
-        this._betaBotClient.user?.id || ''
-      )
-    ) {
+    // Check if conversation is active
+    if (!this._conversationService.isConversationActive()) {
+      console.log('[Beta Bot] No active conversation');
       return;
     }
+
+    console.log('[Beta Bot] Processing message from:', message.author.username);
 
     try {
       // Remove beta bot's mention and clean up prompt
@@ -101,7 +103,7 @@ class DualBotService {
         .trim();
 
       // Add this message to conversation context
-      this._conversationService.addMessage(message.author.id, message.content);
+      await this._conversationService.addMessage(message.author.id, message.content);
 
       // Build context for beta bot
       const context = this._conversationService.buildContextForBot(
@@ -120,7 +122,7 @@ class DualBotService {
         await message.reply(reply);
 
         // Add beta bot's response to conversation context
-        this._conversationService.addMessage(
+        await this._conversationService.addMessage(
           this._betaBotClient.user?.id || '',
           response
         );
@@ -137,12 +139,25 @@ class DualBotService {
     // Initialize beta bot
     this._betaBotClient.once(DiscordEvents.ClientReady, () => {
       console.log(`🤖 Beta bot online: ${this._betaBotClient.user?.tag}`);
+      console.log(`🤖 Beta bot ID: ${this._betaBotClient.user?.id}`);
+      
+      // Set beta bot ID in Primate Prime service
+      this._primatePrime.setBetaBotId(this._betaBotClient.user?.id || '');
+      console.log(`✅ Set beta bot ID in Primate Prime service`);
     });
 
     // Beta bot message handling - ONLY conversation channel
     this._betaBotClient.on(DiscordEvents.MessageCreate, async (message) => {
-      // Ignore bot messages
-      if (message.author.bot) return;
+      // During conversations, allow messages from Alpha bot, otherwise ignore bot messages
+      if (message.author.bot) {
+        // Only allow Alpha bot messages during active conversations
+        if (
+          !this._conversationService.isConversationActive() ||
+          message.author.id !== this._alphaBotClient.user?.id
+        ) {
+          return;
+        }
+      }
 
       await this.processBetaBotMessage(message as DiscordMessage);
     });
