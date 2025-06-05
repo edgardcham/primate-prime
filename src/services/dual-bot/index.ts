@@ -82,7 +82,12 @@ class DualBotService {
 
     // Check if beta bot is mentioned
     const betaBotMention = `<@${this._betaBotClient.user?.id}>`;
-    console.log('[Beta Bot] Checking for mention:', betaBotMention, 'in message:', message.content);
+    console.log(
+      '[Beta Bot] Checking for mention:',
+      betaBotMention,
+      'in message:',
+      message.content
+    );
     if (!message.content.includes(betaBotMention)) {
       console.log('[Beta Bot] Not mentioned - ignoring');
       return;
@@ -103,7 +108,10 @@ class DualBotService {
         .trim();
 
       // Add this message to conversation context
-      await this._conversationService.addMessage(message.author.id, message.content);
+      await this._conversationService.addMessage(
+        message.author.id,
+        message.content
+      );
 
       // Build context for beta bot
       const context = this._conversationService.buildContextForBot(
@@ -140,7 +148,7 @@ class DualBotService {
     this._betaBotClient.once(DiscordEvents.ClientReady, () => {
       console.log(`🤖 Beta bot online: ${this._betaBotClient.user?.tag}`);
       console.log(`🤖 Beta bot ID: ${this._betaBotClient.user?.id}`);
-      
+
       // Set beta bot ID in Primate Prime service
       this._primatePrime.setBetaBotId(this._betaBotClient.user?.id || '');
       console.log(`✅ Set beta bot ID in Primate Prime service`);

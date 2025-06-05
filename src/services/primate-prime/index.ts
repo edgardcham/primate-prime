@@ -355,7 +355,10 @@ class PrimatePrime {
 
     console.log('[START COMMAND] Alpha ID:', alphaId);
     console.log('[START COMMAND] Beta ID:', betaId);
-    console.log('[START COMMAND] Alpha user tag:', this._discord.client.user?.tag);
+    console.log(
+      '[START COMMAND] Alpha user tag:',
+      this._discord.client.user?.tag
+    );
 
     if (!betaId) {
       await interaction.editReply({
@@ -384,13 +387,17 @@ class PrimatePrime {
         setTimeout(async () => {
           try {
             if (!this._conversationService) {
-              console.error('Conversation service not available for auto-start');
+              console.error(
+                'Conversation service not available for auto-start'
+              );
               return;
             }
 
             // Build context for Alpha bot
-            const context = this._conversationService.buildContextForBot(alphaId);
-            const fullPrompt = context + '\n\nStart the conversation about: ' + prompt;
+            const context =
+              this._conversationService.buildContextForBot(alphaId);
+            const fullPrompt =
+              context + '\n\nStart the conversation about: ' + prompt;
 
             // Generate Alpha's response using vanilla personality
             const response = await this._openaiClient.createResponse(
@@ -461,20 +468,27 @@ class PrimatePrime {
           const nextSpeakerId = this._conversationService.getNextSpeakerId();
           if (nextSpeakerId) {
             const isAlpha = nextSpeakerId === this._discord.client.user?.id;
-            
+
             if (isAlpha) {
               // Alpha bot should respond
-              const context = this._conversationService.buildContextForBot(nextSpeakerId);
+              const context =
+                this._conversationService.buildContextForBot(nextSpeakerId);
               const fullPrompt = context + '\n\nContinue the conversation:';
-              
-              const response = await this._openaiClient.createResponse('vanilla', fullPrompt);
-              
+
+              const response = await this._openaiClient.createResponse(
+                'vanilla',
+                fullPrompt
+              );
+
               if (response) {
                 const channel = interaction.channel;
                 if (channel && channel.isTextBased()) {
                   const reply = this._discord.buildMessageReply(response);
                   await (channel as any).send(reply);
-                  await this._conversationService.addMessage(nextSpeakerId, response);
+                  await this._conversationService.addMessage(
+                    nextSpeakerId,
+                    response
+                  );
                 }
               }
             }

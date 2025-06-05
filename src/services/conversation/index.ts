@@ -25,9 +25,9 @@ export interface ConversationState {
 }
 
 // Constants for rolling window
-const WINDOW = 6;          // verbatim turns kept
-const CHUNK = 6;           // size of each compaction batch
-const MAX_SUMMARIES = 10;  // ring buffer for summaries
+const WINDOW = 6; // verbatim turns kept
+const CHUNK = 6; // size of each compaction batch
+const MAX_SUMMARIES = 10; // ring buffer for summaries
 
 class ConversationService {
   private _config: InMemoryConfig;
@@ -186,14 +186,15 @@ class ConversationService {
           : 'admin';
 
     // Clean content by removing Discord mentions to avoid confusion
-    const cleanContent = content
-      .replace(/<@!?\d+>/g, '')
-      .trim();
+    const cleanContent = content.replace(/<@!?\d+>/g, '').trim();
 
     // Duplicate guard: prevent bot->bot double posts
     const last = this._state.context.at(-1);
-    if (last && last.speaker === speaker && 
-        this.calculateOverlap(last.content, cleanContent) > 0.9) {
+    if (
+      last &&
+      last.speaker === speaker &&
+      this.calculateOverlap(last.content, cleanContent) > 0.9
+    ) {
       console.log('[Conversation] Duplicate message detected, ignoring');
       return;
     }
@@ -222,7 +223,7 @@ class ConversationService {
     if (!this._state) return;
 
     // How many full turns (non-admin) do we have?
-    const nonAdmin = this._state.context.filter(m => m.speaker !== 'admin');
+    const nonAdmin = this._state.context.filter((m) => m.speaker !== 'admin');
     if (nonAdmin.length <= WINDOW + CHUNK) return; // nothing to compact yet
 
     // Carve out the *oldest* CHUNK that sits before the last WINDOW
@@ -230,7 +231,7 @@ class ConversationService {
     const slice = nonAdmin.slice(cutIndex, cutIndex + CHUNK);
 
     // Build raw text for summary
-    const convo = slice.map(m => `${m.speaker}: ${m.content}`).join('\n');
+    const convo = slice.map((m) => `${m.speaker}: ${m.content}`).join('\n');
 
     const prompt = `summarize the following 6-turn chat in ≤25 words.
 • start with a 3-word tag in brackets.
@@ -248,7 +249,9 @@ ${convo}`.trim();
       mem.push(summary.trim());
 
       // Actually remove those CHUNK messages from context
-      this._state.context = this._state.context.filter(m => !slice.includes(m));
+      this._state.context = this._state.context.filter(
+        (m) => !slice.includes(m)
+      );
 
       this.saveState();
       console.log('[Conversation] Compacted:', summary);
@@ -260,9 +263,8 @@ ${convo}`.trim();
   public buildContextForBot(botId: string): string {
     if (!this._state?.isActive) return '';
 
-    const otherId = (botId === this._state.alphaId) 
-      ? this._state.betaId 
-      : this._state.alphaId;
+    const otherId =
+      botId === this._state.alphaId ? this._state.betaId : this._state.alphaId;
 
     let out = '';
 
@@ -276,10 +278,11 @@ ${convo}`.trim();
     const recent = this._state.context.slice(-WINDOW);
     if (recent.length > 0) {
       out += 'recent turns:\n';
-      out += recent.map(m => `${m.speaker}: ${m.content}`).join('\n') + '\n\n';
+      out +=
+        recent.map((m) => `${m.speaker}: ${m.content}`).join('\n') + '\n\n';
     }
 
-    // 3) Check for overlap warning  
+    // 3) Check for overlap warning
     if (recent.length >= 2) {
       const last = recent.at(-1);
       const prev = recent.at(-2);
@@ -306,7 +309,7 @@ ${convo}`.trim();
   private calculateOverlap(text1: string, text2: string): number {
     const words1 = new Set(text1.toLowerCase().split(/\s+/));
     const words2 = new Set(text2.toLowerCase().split(/\s+/));
-    const intersection = new Set([...words1].filter(x => words2.has(x)));
+    const intersection = new Set([...words1].filter((x) => words2.has(x)));
     const union = new Set([...words1, ...words2]);
     return union.size > 0 ? intersection.size / union.size : 0;
   }
